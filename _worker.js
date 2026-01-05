@@ -1598,7 +1598,15 @@ const HTML = `<!DOCTYPE html>
         .el-input-group__append .el-select .el-input.is-focus .el-input__wrapper { box-shadow: none !important; }
         .el-input-group__append .el-select { margin: 0; }
         .el-input-group__append .el-select .el-input__inner { text-align: center; font-weight: bold; font-size: 12px; }
+
+        /* Timeline Fixes */
+        .el-timeline-item__node--normal { width: 10px; height: 10px; left: 0px; }
+        .el-timeline-item__tail { left: 4px; border-left: 2px dashed var(--border); }
+        .el-timeline-item__wrapper { padding-left: 24px; top: -3px; }
         
+        /* Dark Mode adjustments for Timeline */
+        html.dark .mecha-panel { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); }
+        html.dark .el-timeline-item__tail { border-left-color: #334155; }
         .disabled-row { opacity: 0.5; filter: grayscale(1); }
         .tag-compact { display: inline-flex; height: 16px; padding: 0 6px; border-radius: 3px; font-size: 9px; font-weight: 600; background: var(--bg-body); color: var(--text-dim); border: 1px solid var(--border); align-items: center; }
         
@@ -2272,8 +2280,8 @@ const HTML = `<!DOCTYPE html>
                 <template #footer><el-button @click="settingsVisible=false" size="large" class="mecha-btn">{{ t('cancel') }}</el-button><el-button type="primary" @click="saveSettings" size="large" class="mecha-btn !bg-blue-600">{{ t('saveSettings') }}</el-button></template>
             </el-dialog>
 
-            <!-- Renew Dialog -->
-            <el-dialog v-model="renewDialogVisible" :title="t('manualRenew')" width="500px" align-center class="mecha-panel !rounded-none">
+            <!-- Renew Dialog (also used for Add History) -->
+            <el-dialog v-model="renewDialogVisible" :title="renewMode === 'addHistory' ? t('btnAddHist') : t('manualRenew')" width="500px" align-center class="mecha-panel !rounded-none">
                <el-form label-position="top">
                  <el-form-item :label="t('renewDate')">
                     <el-date-picker v-model="renewForm.renewDate" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" style="width:100%" class="!w-full"></el-date-picker>
@@ -2306,54 +2314,105 @@ const HTML = `<!DOCTYPE html>
             </el-dialog>
 
             <!-- History Dialog -->
-            <el-dialog v-model="historyDialogVisible" :title="currentHistoryItem.name + ' - ' + t('historyTitle')" width="700px" align-center class="mecha-panel !rounded-none">
-                <div class="flex gap-4 mb-4 bg-slate-50 dark:bg-slate-800 p-3 rounded border border-slate-100 dark:border-slate-700">
-                     <div><span class="text-xs text-gray-400 uppercase font-bold">{{t('totalCost')}}</span> <div class="font-bold text-lg font-mono text-blue-600">{{historyStats.total}} <span class="text-xs text-gray-500">{{historyStats.currency}}</span></div></div>
-                     <div><span class="text-xs text-gray-400 uppercase font-bold">{{t('totalCount')}}</span> <div class="font-bold text-lg font-mono">{{historyStats.count}}</div></div>
-                     <div class="flex-1 text-right self-center">
-                         <el-button size="small" type="primary" @click="addHistoryRecord" plain><el-icon class="mr-1"><Plus/></el-icon>{{t('btnAddHist')}}</el-button>
+<el-dialog v-model="historyDialogVisible" :title="currentHistoryItem.name + ' - ' + t('historyTitle')" width="700px" align-center class="mecha-panel !rounded-none" style="clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);">
+                <div class="mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded border border-slate-100 dark:border-slate-700 relative flex items-center justify-between">
+                     <div class="flex items-center gap-8">
+                         <div class="flex items-center gap-3">
+                             <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">{{t('totalCost')}}</div> 
+                             <div class="font-black text-2xl font-mono text-blue-600 dark:text-blue-400 leading-none">{{historyStats.total}} <span class="text-xs text-gray-400 font-bold align-top ml-0.5">{{historyStats.currency}}</span></div>
+                         </div>
+                         <div class="w-px h-8 bg-slate-200 dark:bg-slate-700"></div>
+                         <div class="flex items-center gap-3">
+                             <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">{{t('totalCount')}}</div> 
+                             <div class="font-black text-2xl font-mono text-amber-500 leading-none">{{historyStats.count}}</div>
+                         </div>
                      </div>
+                     <el-tooltip :content="t('btnAddHist')" placement="left">
+                         <el-button type="success" circle plain @click="addHistoryRecord" :icon="Plus" class="!border-emerald-200 !text-emerald-600 hover:!bg-emerald-50"></el-button>
+                     </el-tooltip>
                 </div>
                 
-                <el-table :data="pagedHistory" size="small" border style="width: 100%">
-                     <el-table-column :label="t('opDate')" prop="renewDate" width="110">
-                         <template #default="{row}"><el-date-picker v-model="row.renewDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:100%" :clearable="false"></el-date-picker></template>
-                     </el-table-column>
-                     <el-table-column :label="t('period')" min-width="180">
-                         <template #default="{row}">
-                             <div class="flex flex-col gap-1">
-                                 <el-date-picker v-model="row.startDate" type="date" value-format="YYYY-MM-DD" size="small" :placeholder="t('startDate')" style="width:100%" :clearable="false"></el-date-picker>
-                                 <el-date-picker v-model="row.endDate" type="date" value-format="YYYY-MM-DD" size="small" :placeholder="t('endDate')" style="width:100%" :clearable="false"></el-date-picker>
-                             </div>
-                         </template>
-                     </el-table-column>
-                     <el-table-column :label="t('amount')" width="140">
-                         <template #default="{row}">
-                              <div class="flex gap-1">
-                                  <el-input-number v-model="row.price" :min="0" :precision="2" :controls="false" size="small" style="width:60px"></el-input-number>
-                                  <el-select v-model="row.currency" size="small" style="width:70px">
-                                      <el-option v-for="c in currencyList" :key="c" :label="c" :value="c"></el-option>
-                                  </el-select>
-                              </div>
-                         </template>
-                     </el-table-column>
-                     <el-table-column :label="t('note')">
-                         <template #default="{row}"><el-input v-model="row.note" size="small"></el-input></template>
-                     </el-table-column>
-                      <el-table-column width="50" align="center">
-                         <template #default="{$index}">
-                             <el-button type="danger" link size="small" @click="removeHistoryRecord($index)"><el-icon><Delete/></el-icon></el-button>
-                         </template>
-                     </el-table-column>
-                </el-table>
-                <div class="mt-2 flex justify-end" v-if="currentHistoryItem.renewHistory.length > historyPageSize">
+                <div class="max-h-[500px] overflow-y-auto px-1">
+                    <el-timeline v-if="pagedHistory.length > 0">
+                        <el-timeline-item v-for="(item, index) in pagedHistory" :key="index" :type="index===0?'primary':''" :hollow="index!==0" :timestamp="formatLogTime(item.renewDate)" placement="top" hide-timestamp>
+                            
+                            <div class="mecha-panel p-3 mb-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow relative group">
+                                
+                                <div v-if="editingHistoryIndex !== index">
+                                    <div class="flex justify-between items-center mb-2 border-b border-slate-100 dark:border-slate-800 pb-1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-mono text-base font-bold text-slate-700 dark:text-slate-200 tracking-tight">
+                                                {{ item.renewDate ? item.renewDate.substring(0, 16) : 'N/A' }}
+                                            </span>
+                                            <span v-if="index===0" class="text-[9px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-sm font-bold">LATEST</span>
+                                            <span v-if="item.note && (item.note.includes('Auto') || item.note.includes('自动'))" class="text-[9px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-sm font-bold">AUTO</span>
+                                            <span v-else class="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-sm font-bold">MANUAL</span>
+                                        </div>
+                                        <div class="flex gap-1">
+                                            <el-button type="primary" link size="small" @click="startEditHistory(index, item)" :icon="Edit"></el-button>
+                                            <el-popconfirm :title="t('msg.confirmDel')" @confirm="removeHistoryRecord(index)">
+                                                <template #reference><el-button type="danger" link size="small" :icon="Delete"></el-button></template>
+                                            </el-popconfirm>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <div class="flex items-center gap-2 flex-1">
+                                            <span class="text-xs text-gray-400 uppercase font-bold">{{ t('billPeriod') }}</span>
+                                            <div class="font-mono text-sm font-bold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 inline-block px-2 py-0.5 border border-slate-200 dark:border-slate-700 rounded-sm">
+                                                {{ item.startDate }} <span class="mx-1 text-gray-300">-></span> {{ item.endDate }}
+                                            </div>
+                                        </div>
+                                        <div class="text-lg font-black font-mono text-blue-600 dark:text-blue-400 leading-none">{{ item.price }} <span class="text-xs font-bold text-gray-400">{{ item.currency }}</span></div>
+                                    </div>
+
+                                    <div class="flex items-start gap-3" v-if="item.note && !item.note.includes('Auto')">
+                                        <div class="text-xs text-gray-500 dark:text-gray-400 font-mono italic mt-0.5 break-all">
+                                            📝 {{ item.note }}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div v-else class="bg-blue-50/50 dark:bg-slate-800/50 -m-2 p-4 border border-blue-200 dark:border-blue-800 relative">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+                                        <div>
+                                            <div class="text-[10px] text-blue-500 font-bold mb-1">{{ t('opDate') }}</div>
+                                            <el-date-picker v-model="tempHistoryItem.renewDate" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" size="small" style="width:100%" :clearable="false"></el-date-picker>
+                                        </div>
+                                        <div>
+                                            <div class="text-[10px] text-blue-500 font-bold mb-1">{{ t('amount') }} ({{ tempHistoryItem.currency }})</div>
+                                            <el-input-number v-model="tempHistoryItem.price" :min="0" :precision="2" :controls="false" size="small" style="width:100%" class="!w-full"></el-input-number>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3 opacity-60">
+                                        <div class="text-[10px] text-gray-500 font-bold mb-1">{{ t('billPeriod') }} ({{ t('readOnly') }})</div>
+                                        <div class="flex items-center gap-2">
+                                            <el-input v-model="tempHistoryItem.startDate" size="small" disabled class="!w-32"></el-input>
+                                            <span class="text-gray-400">-</span>
+                                            <el-input v-model="tempHistoryItem.endDate" size="small" disabled class="!w-32"></el-input>
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <div class="text-[10px] text-blue-500 font-bold mb-1">{{ t('note') }}</div>
+                                        <el-input v-model="tempHistoryItem.note" size="small" placeholder="Optional note..."></el-input>
+                                    </div>
+                                    <div class="flex justify-end gap-2 mt-4 pt-3 border-t border-blue-100 dark:border-blue-900">
+                                        <el-button size="small" text @click="cancelEditHistory">{{ t('cancel') }}</el-button>
+                                        <el-button size="small" type="primary" @click="saveEditHistory(index)">{{ t('save') }}</el-button>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </el-timeline-item>
+                    </el-timeline>
+                    <el-empty v-else :description="t('noLogs')"></el-empty>
+                </div>
+
+                <div class="mt-4 flex justify-end" v-if="currentHistoryItem.renewHistory.length > historyPageSize">
                      <el-pagination layout="prev, pager, next" :total="currentHistoryItem.renewHistory.length" :page-size="historyPageSize" v-model:current-page="historyPage" hide-on-single-page background small></el-pagination>
                 </div>
-                <template #footer>
-                    <el-button @click="historyDialogVisible=false">{{t('cancel')}}</el-button>
-                    <el-button type="primary" @click="saveHistoryInfo">{{t('save')}}</el-button>
-                </template>
             </el-dialog>
+
 
             <el-drawer v-model="historyVisible" :title="t('sysLogs')" :size="drawerSize">
                 <div class="p-6" v-loading="historyLoading">
@@ -2434,7 +2493,7 @@ const HTML = `<!DOCTYPE html>
             zh: { filter:{expired:'已过期 / 今天', w7:'7天内', w30:'30天内', future:'远期(>30天)', new:'新服务 (<30天)', stable:'稳定 (1个月-1年)', long:'长期 (>1年)', m1:'最近1个月', m6:'半年内', year:'今年内', earlier:'更早以前'}, secPref: '偏好设置',manualRenew: '手动续期',tipToggle: '切换状态',tipRenew: '手动续期',tipEdit: '编辑服务',tipDelete: '删除服务',secNotify: '通知配置',secData: '数据管理',lblIcsTitle: '日历订阅',lblIcsUrl: '订阅地址 (iOS/Google)',btnCopy: '复制',btnResetToken: '重置令牌',loginTitle:'身份验证',passwordPlaceholder:'请输入访问密钥/Authorization Key',unlockBtn:'解锁终端/UNLOCK',check:'立即检查',add:'新增服务',settings:'系统设置',logs:'运行日志',logout:'安全退出',totalServices:'服务总数',expiringSoon:'即将到期',expiredAlert:'已过期 / 警告',serviceName:'服务名称',type:'类型',nextDue:'下次到期',uptime:'已运行',lastRenew:'上次续期',cyclePeriod:'周期',actions:'操作',cycle:'循环订阅',reset:'到期重置',disabled:'已停用',days:'天',daysUnit:'天',typeReset:'到期重置',typeCycle:'循环订阅',lunarCal:'农历',lbOffline:'离线',unit:{day:'天',month:'月',year:'年'},editService:'编辑服务',newService:'新增服务',formName:'名称',namePlaceholder:'例如: Netflix',formType:'模式',createDate:'创建时间',interval:'周期时长',note:'备注信息',status:'状态',active:'启用',disabledText:'禁用',cancel:'取消',save:'保存数据',saveSettings:'保存配置',settingsTitle:'系统设置',setNotify:'通知配置',pushSwitch:'推送总开关',pushUrl:'Webhook 地址',notifyThreshold:'提醒阈值',setAuto:'自动化配置',autoRenewSwitch:'自动续期',autoRenewThreshold:'自动续期阈值',autoDisableThreshold:'自动禁用阈值',daysOverdue:'天后触发',sysLogs:'系统日志',execLogs:'执行记录',clearHistory:'清空历史',noLogs:'无记录',liveLog:'实时终端',btnExport: '导出备份',btnImport: '恢复备份',btnTest: '发送测试',btnRefresh:'刷新日志',
             lblEnable: '启用', lblToken: '令牌 (Token)', lblApiKey: 'API Key', lblChatId: '会话ID', 
             lblServer: '服务器URL', lblDevKey: '设备Key', lblFrom: '发件人', lblTo: '收件人',
-            lblTopic: '主题 (Topic)',
+            lblTopic: '主题 (Topic)',readOnly: '只读',
             lblNotifyTime: '提醒时间', btnResetToken: '重置令牌',
             lblHeaders: '请求头 (JSON)', lblBody: '消息体 (JSON)',
             tag:{alert:'触发提醒',renew:'自动续期',disable:'自动禁用',normal:'检查正常'},msg:{confirmRenew: '确认将 [%s] 的更新日期设置为今天吗？',renewSuccess: '续期成功！日期已更新: %s -> %t',tokenReset: '令牌已重置，请更新订阅地址', copyOk: '链接已复制', exportSuccess: '备份已下载',importSuccess: '数据恢复成功，即将刷新',importFail: '导入失败，请检查文件格式',passReq:'请输入密码',saved:'保存成功',saveFail:'保存失败',cleared:'已清空',clearFail:'清空失败',loginFail:'验证失败',loadLogFail:'日志加载失败',confirmDel:'确认删除此项目?',dateError:'上次更新日期不能早于创建日期',nameReq:'服务名称不能为空',nameExist:'服务名称已存在',futureError:'上次续期不能是未来时间',serviceDisabled:'服务已停用',serviceEnabled:'服务已启用',execFinish: '执行完毕!'},tags:'标签',tagPlaceholder:'输入标签回车创建',searchPlaceholder:'搜索标题或备注...',tagsCol:'标签',tagAll:'全部',useLunar:'农历周期',lunarTip:'按农历日期计算周期',yes:'是',no:'否',timezone:'偏好时区',disabledFilter:'已停用',policyConfig:'自动化策略',policyNotify:'提醒提前期',policyAuto:'自动续期',policyRenewDay:'过期续期天数',useGlobal:'全局默认',autoRenewOnDesc:'过期自动续期',autoRenewOffDesc:'过期自动禁用',previewCalc:'根据上次续期日期和周期计算',nextDue:'下次到期',
@@ -2442,7 +2501,7 @@ const HTML = `<!DOCTYPE html>
             en: { filter:{expired:'Overdue/Today', w7:'Within 7 Days', w30:'Within 30 Days', future:'Future(>30d)', new:'New (<30d)', stable:'Stable (1m-1y)', long:'Long Term (>1y)', m1:'Last Month', m6:'Last 6 Months', year:'This Year', earlier:'Earlier'}, secPref: 'PREFERENCES',manualRenew: 'Quick Renew',tipToggle: 'Toggle Status',tipRenew: 'Quick Renew',tipEdit: 'Edit Service',tipDelete: 'Delete Service',secNotify: 'NOTIFICATIONS',secData: 'DATA MANAGEMENT',lblIcsTitle: 'CALENDAR SUBSCRIPTION',lblIcsUrl: 'ICS URL (iOS/Google Calendar)',btnCopy: 'COPY',btnResetToken: 'RESET TOKEN',loginTitle:'SYSTEM ACCESS',passwordPlaceholder:'Authorization Key',unlockBtn:'UNLOCK TERMINAL',check:'CHECK',add:'ADD NEW',settings:'CONFIG',logs:'LOGS',logout:'LOGOUT',totalServices:'TOTAL SERVICES',expiringSoon:'EXPIRING SOON',expiredAlert:'EXPIRED / ALERT',serviceName:'SERVICE NAME',type:'TYPE',nextDue:'NEXT DUE',uptime:'UPTIME',lastRenew:'LAST RENEW',cyclePeriod:'CYCLE',actions:'ACTIONS',cycle:'CYCLE',reset:'RESET',disabled:'DISABLED',days:'DAYS',daysUnit:'DAYS',typeReset:'RESET',typeCycle:'CYCLE',lunarCal:'Lunar',lbOffline:'OFFLINE',unit:{day:'DAY',month:'MTH',year:'YR'},editService:'EDIT SERVICE',newService:'NEW SERVICE',formName:'NAME',namePlaceholder:'e.g. Netflix',formType:'MODE',createDate:'CREATE DATE',interval:'INTERVAL',note:'NOTE',status:'STATUS',active:'ACTIVE',disabledText:'DISABLED',cancel:'CANCEL',save:'SAVE DATA',saveSettings:'SAVE CONFIG',settingsTitle:'SYSTEM CONFIG',setNotify:'NOTIFICATION',pushSwitch:'MASTER PUSH',pushUrl:'WEBHOOK URL',notifyThreshold:'ALERT THRESHOLD',setAuto:'AUTOMATION',autoRenewSwitch:'AUTO RENEW',autoRenewThreshold:'RENEW AFTER',autoDisableThreshold:'DISABLE AFTER',daysOverdue:'DAYS OVERDUE',sysLogs:'SYSTEM LOGS',execLogs:'EXECUTION LOGS',clearHistory:'CLEAR HISTORY',noLogs:'NO DATA',liveLog:'LIVE TERMINAL',btnExport: 'Export Data',btnImport: 'Import Data',btnTest: 'Send Test',btnRefresh:'REFRESH',
             lblEnable: 'Enable', lblToken: 'Token', lblApiKey: 'API Key', lblChatId: 'Chat ID', 
             lblServer: 'Server URL', lblDevKey: 'Device Key', lblFrom: 'From Email', lblTo: 'To Email',
-            lblTopic: 'Topic',
+            lblTopic: 'Topic',readOnly: 'Read-only',
             lblNotifyTime: 'Alarm Time', btnResetToken: 'RESET TOKEN',
             lblHeaders: 'Headers (JSON)', lblBody: 'Body (JSON)',
             tag:{alert:'ALERT',renew:'RENEWED',disable:'DISABLED',normal:'NORMAL'},msg:{confirmRenew: 'Renew [%s] to today based on your timezone?',renewSuccess: 'Renewed! Date updated: %s -> %t',tokenReset: 'Token Reset. Update your calendar apps.', copyOk: 'Link Copied', exportSuccess: 'Backup Downloaded',importSuccess: 'Restore Success, Refreshing...',importFail: 'Import Failed, Check File Format',passReq:'Password Required',saved:'Data Saved',saveFail:'Save Failed',cleared:'Cleared',clearFail:'Clear Failed',loginFail:'Access Denied',loadLogFail:'Load Failed',confirmDel:'Confirm Delete?',dateError:'Last renew date cannot be earlier than create date',nameReq:'Name Required',nameExist:'Name already exists',futureError:'Renew date cannot be in the future',serviceDisabled:'Service Disabled',serviceEnabled:'Service Enabled',execFinish: 'EXECUTION FINISHED!'},tags:'TAGS',tagPlaceholder:'Press Enter to create tag',searchPlaceholder:'Search...',tagsCol:'TAGS',tagAll:'ALL',useLunar:'Lunar Cycle',lunarTip:'Calculate based on Lunar calendar',yes:'Yes',no:'No',timezone:'Timezone',disabledFilter:'DISABLED',policyConfig:'Policy Config',policyNotify:'Notify Days',policyAuto:'Auto Renew',policyRenewDay:'Renew Days',useGlobal:'Global Default',autoRenewOnDesc:'Auto Renew when overdue',autoRenewOffDesc:'Auto Disable when overdue',previewCalc:'Based on Last Renew Date & Interval',nextDue:'NEXT DUE',
@@ -2911,12 +2970,33 @@ const HTML = `<!DOCTYPE html>
 
                 // --- Bill Management Logic ---
                 const renewDialogVisible = ref(false);
+                const renewMode = ref('renew'); // 'renew' | 'addHistory'
                 const renewForm = ref({ id:'', name:'', renewDate:'', startDate:'', endDate:'', price:0, currency:'', note:'' });
                 const historyDialogVisible = ref(false);
                 const currentHistoryItem = ref({ renewHistory: [] });
+                const editingHistoryIndex = ref(-1);
+                const tempHistoryItem = ref({});
                 const historyPage = ref(1);
                 const historyPageSize = ref(5);
+// --- History Edit Logic ---
 
+
+
+                // 覆盖原有的 saveHistoryInfo (现在不需要手动点底部的保存了，改为行内保存，或者你可以保留它作为批量保存)
+                // 这里我们修改原有的 saveHistoryInfo 为关闭弹窗，因为现在是行内即时保存
+                const saveHistoryInfo = async () => {
+                   const realRow = list.value.find(i => i.id === currentHistoryItem.value.id);
+                   if (realRow) {
+                       realRow.renewHistory = currentHistoryItem.value.renewHistory;
+                       await saveData(null, null, true);
+                   }
+                   historyDialogVisible.value = false;
+                };
+                
+                // 监听弹窗关闭，重置编辑状态
+                watch(historyDialogVisible, (val) => {
+                    if (!val) cancelEditHistory();
+                });
                 const openRenew = (row) => {
                     // Helper: 格式化日期 (YYYY-MM-DD)
                     const formatDate = (d) => \`\${d.getFullYear()}-\${(d.getMonth() + 1).toString().padStart(2, '0')}-\${d.getDate().toString().padStart(2, '0')}\`;
@@ -2993,33 +3073,64 @@ const HTML = `<!DOCTYPE html>
                         currency: row.currency || settings.value.defaultCurrency || 'CNY',
                         note: ''
                     };
+                    renewMode.value = 'renew';
                     renewDialogVisible.value = true;
                 };
 
                 const submitRenew = async () => {
                     const rf = renewForm.value;
-                    const row = list.value.find(i => i.id === rf.id);
-                    if (!row) return;
-
-                    // 1. Append Logic - 构建纯净的历史记录对象
+                    
+                    // 构建历史记录对象
                     const historyRecord = {
-                        renewDate: rf.renewDate, // 此时格式应为 "YYYY-MM-DD HH:mm:ss"
-                        startDate: rf.startDate, // 此时格式应为 "YYYY-MM-DD"
-                        endDate: rf.endDate,     // 此时格式应为 "YYYY-MM-DD"
+                        renewDate: rf.renewDate,
+                        startDate: rf.startDate,
+                        endDate: rf.endDate,
                         price: rf.price,
                         currency: rf.currency,
                         note: rf.note
                     };
                     
+                    // ===== addHistory 模式：补录历史 =====
+                    if (renewMode.value === 'addHistory') {
+                        // 验证周期重叠
+                        const overlapResult = checkPeriodOverlap(rf.startDate, rf.endDate);
+                        if (overlapResult.overlap) {
+                            const existRecord = overlapResult.record;
+                            ElMessage.warning(lang.value === 'zh' 
+                                ? '账单周期与已有记录重叠 (' + existRecord.startDate + ' ~ ' + existRecord.endDate + ')，请修改已有记录而非添加新记录'
+                                : 'Period overlaps with existing record (' + existRecord.startDate + ' ~ ' + existRecord.endDate + '). Please edit the existing record instead.'
+                            );
+                            return;
+                        }
+                        
+                        // 添加记录后按 endDate 降序排序（最新的在前）
+                        const history = currentHistoryItem.value.renewHistory;
+                        history.push(historyRecord);
+                        history.sort((a, b) => new Date(b.endDate) - new Date(a.endDate));
+                        
+                        // 同步到主列表并保存
+                        const realRow = list.value.find(i => i.id === currentHistoryItem.value.id);
+                        if (realRow) {
+                            realRow.renewHistory = currentHistoryItem.value.renewHistory;
+                            await saveData(null, null, true);
+                        }
+                        
+                        renewDialogVisible.value = false;
+                        historyPage.value = 1;
+                        return;
+                    }
+                    
+                    // ===== renew 模式：手动续期 =====
+                    const row = list.value.find(i => i.id === rf.id);
+                    if (!row) return;
+                    
                     if (!Array.isArray(row.renewHistory)) row.renewHistory = [];
-                    row.renewHistory.unshift(historyRecord); // Newest first
+                    row.renewHistory.unshift(historyRecord);
 
-                    // 2. Update Row - 从操作时间中提取纯日期
+                    // 更新主记录的 lastRenewDate
                     const oldDate = row.lastRenewDate;
-                    // 使用 substring 提取前10位 (YYYY-MM-DD)，比 split(' ') 更稳健，防止意外空格导致切割错误
                     row.lastRenewDate = rf.renewDate.substring(0, 10);
 
-                    // 3. Save
                     await saveData(null, null, false);
                     renewDialogVisible.value = false;
                     tableKey.value++;
@@ -3032,6 +3143,32 @@ const HTML = `<!DOCTYPE html>
                     if (!Array.isArray(currentHistoryItem.value.renewHistory)) currentHistoryItem.value.renewHistory = [];
                     historyPage.value = 1;
                     historyDialogVisible.value = true;
+                    editingHistoryIndex.value = -1;
+                };
+
+                const startEditHistory = (index, item) => {
+                    editingHistoryIndex.value = index;
+                    tempHistoryItem.value = JSON.parse(JSON.stringify(item));
+                };
+
+                const cancelEditHistory = () => {
+                    editingHistoryIndex.value = -1;
+                    tempHistoryItem.value = {};
+                };
+
+                const saveEditHistory = (index) => {
+                    // Update the array item
+                    const realIndex = (historyPage.value - 1) * historyPageSize.value + index;
+                    
+                    // Logic to update the actual item in renewHistory
+                    if (realIndex >= 0 && realIndex < currentHistoryItem.value.renewHistory.length) {
+                         const updated = { ...currentHistoryItem.value.renewHistory[realIndex], ...tempHistoryItem.value };
+                         // Ensure strings are saved (inputs bind to strings mostly)
+                         currentHistoryItem.value.renewHistory[realIndex] = updated;
+                    }
+                    
+                    editingHistoryIndex.value = -1;
+                    saveHistoryInfo(); // Auto save to persist
                 };
 
                 const pagedHistory = computed(() => {
@@ -3040,24 +3177,102 @@ const HTML = `<!DOCTYPE html>
                     return hist.slice(start, start + historyPageSize.value);
                 });
 
-                const addHistoryRecord = () => {
-                    const d = getLocalToday();
-                    currentHistoryItem.value.renewHistory.unshift({
-                        renewDate: d, startDate: d, endDate: d, price: 0, currency: settings.value.defaultCurrency||'CNY', note: ''
-                    });
+                // --- Add History Dialog State ---
+                const addHistoryDialogVisible = ref(false);
+                const addHistoryForm = ref({ renewDate: '', startDate: '', endDate: '', price: 0, currency: 'CNY', note: '' });
+
+                // Check for period overlap
+                const checkPeriodOverlap = (startDate, endDate, excludeIndex = -1) => {
+                    if (!startDate || !endDate) return { overlap: false };
+                    const newStart = new Date(startDate);
+                    const newEnd = new Date(endDate);
+                    const history = currentHistoryItem.value.renewHistory || [];
+                    
+                    for (let i = 0; i < history.length; i++) {
+                        if (i === excludeIndex) continue;
+                        if (!history[i].startDate || !history[i].endDate) continue;
+                        const existStart = new Date(history[i].startDate);
+                        const existEnd = new Date(history[i].endDate);
+                        // Overlap: newStart < existEnd && newEnd > existStart (允许边界相等，即前一账单结束日=后一账单开始日)
+                        if (newStart < existEnd && newEnd > existStart) {
+                            return { overlap: true, index: i, record: history[i] };
+                        }
+                    }
+                    return { overlap: false };
                 };
-                const removeHistoryRecord = (index) => {
+
+                // Open Add History via Renew Dialog (reuse)
+                const addHistoryRecord = () => {
+                    const now = new Date();
+                    const formatDateTime = (d) => d.getFullYear() + '-' + (d.getMonth() + 1).toString().padStart(2, '0') + '-' + d.getDate().toString().padStart(2, '0') + ' ' + d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0') + ':' + d.getSeconds().toString().padStart(2, '0');
+                    const d = getLocalToday();
+                    renewForm.value = {
+                        id: currentHistoryItem.value.id, // Use currentHistoryItem's id for addHistory mode 
+                        name: currentHistoryItem.value.name,
+                        renewDate: formatDateTime(now),
+                        startDate: d,
+                        endDate: d,
+                        price: 0,
+                        currency: settings.value.defaultCurrency || 'CNY',
+                        note: ''
+                    };
+                    renewMode.value = 'addHistory';
+                    renewDialogVisible.value = true;
+                };
+
+                // Submit Add History
+                const submitAddHistory = async () => {
+                    const form = addHistoryForm.value;
+                    
+                    // Validate required fields
+                    if (!form.renewDate || !form.startDate || !form.endDate) {
+                        ElMessage.error(lang.value === 'zh' ? '请填写完整的日期信息' : 'Please fill in all date fields');
+                        return;
+                    }
+                    
+                    // Check for period overlap
+                    const overlapResult = checkPeriodOverlap(form.startDate, form.endDate);
+                    if (overlapResult.overlap) {
+                        const existRecord = overlapResult.record;
+                        ElMessage.warning(lang.value === 'zh' 
+                            ? '账单周期与已有记录重叠 (' + existRecord.startDate + ' ~ ' + existRecord.endDate + ')，请修改已有记录而非添加新记录'
+                            : 'Period overlaps with existing record (' + existRecord.startDate + ' ~ ' + existRecord.endDate + '). Please edit the existing record instead.'
+                        );
+                        return;
+                    }
+                    
+                    // Add record
+                    const newRecord = {
+                        renewDate: form.renewDate,
+                        startDate: form.startDate,
+                        endDate: form.endDate,
+                        price: form.price,
+                        currency: form.currency,
+                        note: form.note
+                    };
+                    currentHistoryItem.value.renewHistory.unshift(newRecord);
+                    
+                    // Sync and save
+                    const realRow = list.value.find(i => i.id === currentHistoryItem.value.id);
+                    if (realRow) {
+                        realRow.renewHistory = currentHistoryItem.value.renewHistory;
+                        await saveData(null, null, true);
+                    }
+                    
+                    addHistoryDialogVisible.value = false;
+                    historyPage.value = 1;
+                };
+                const removeHistoryRecord = async (index) => {
                     const realIndex = (historyPage.value - 1) * historyPageSize.value + index;
                     currentHistoryItem.value.renewHistory.splice(realIndex, 1);
+                    // Sync to main list and persist
+                    const realRow = list.value.find(i => i.id === currentHistoryItem.value.id);
+                    if (realRow) {
+                        realRow.renewHistory = currentHistoryItem.value.renewHistory;
+                        await saveData(null, null, true);
+                    }
                 };
-                const saveHistoryInfo = async () => {
-                   const realRow = list.value.find(i => i.id === currentHistoryItem.value.id);
-                   if (realRow) {
-                       realRow.renewHistory = currentHistoryItem.value.renewHistory;
-                       await saveData(null, null);
-                       historyDialogVisible.value = false;
-                   }
-                };
+
 
                 const historyStats = computed(() => {
                     const hist = currentHistoryItem.value.renewHistory || [];
@@ -3176,9 +3391,12 @@ const HTML = `<!DOCTYPE html>
                     isDark, toggleTheme, drawerSize, actionColWidth, paginationLayout, confirmDelete, confirmRenew, More, windowWidth,
                     handleSortChange, handleFilterChange, 
                     nextDueFilters, typeFilters, uptimeFilters, lastRenewFilters,
-                    currencyList,
-                    renewDialogVisible, renewForm, openRenew, submitRenew,
-                    historyDialogVisible, currentHistoryItem, historyPage, historyPageSize, pagedHistory, openHistory, saveHistoryInfo, addHistoryRecord, removeHistoryRecord, historyStats
+                    currencyList,editingHistoryIndex, tempHistoryItem, startEditHistory, cancelEditHistory, saveEditHistory,
+                    Money: ElementPlusIconsVue.Money || ElementPlusIconsVue.Coin, // 如果没有 Money 图标，用 Coin 代替
+                    renewDialogVisible, renewMode, renewForm, openRenew, submitRenew,
+                    historyDialogVisible, currentHistoryItem, historyPage, historyPageSize, pagedHistory, openHistory, saveHistoryInfo, addHistoryRecord, removeHistoryRecord, historyStats,
+                    addHistoryDialogVisible, addHistoryForm, submitAddHistory,
+                    editingHistoryIndex, tempHistoryItem, startEditHistory, saveEditHistory, cancelEditHistory
                 };
             }
         }).use(ElementPlus).mount('#app');
